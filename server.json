@@ -1,0 +1,35 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Ansvar-Systems/gleif-mcp",
+  "description": "Offline-first LEI verification with 3.2M entities - Zero API limits, works offline, banking compliance ready",
+  "repository": {
+    "url": "https://github.com/Ansvar-Systems/GLEIF-MCP",
+    "source": "github"
+  },
+  "homepage": "https://ansvar.eu",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "keywords": [
+    "gleif",
+    "lei",
+    "legal-entity-identifier",
+    "compliance",
+    "banking",
+    "kyc",
+    "aml",
+    "mifid",
+    "emir",
+    "offline-first",
+    "sqlite"
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@ansvar/gleif-mcp",
+      "version": "1.0.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

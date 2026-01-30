@@ -1,0 +1,48 @@
+# NPM ignore - exclude dev files from published package
+# Database will be built during prepublish and included
+
+# Development only
+.github/
+tests/
+*.test.ts
+*.test.mjs
+test-*.mjs
+test-*.sh
+tsconfig.json
+
+# IDE
+.idea/
+.vscode/
+.claude/
+.serena/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+.gitleaks.toml
+
+# Environment (exclude from npm)
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+
+# Documentation (keep README, LICENSE, others optional)
+SETUP_COMPLETE.md
+IMPLEMENTATION_HANDOVER.md
+INSTALL.md
+
+# Build artifacts not needed in package
+*.tsbuildinfo

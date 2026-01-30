@@ -1,0 +1,21 @@
+# Git attributes for GLEIF MCP Server
+
+# Binary files - no diff attempts, no merge attempts
+*.db binary
+*.db -diff
+*.zip binary
+*.csv -diff
+
+# Text files - enforce LF line endings
+*.ts text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.sh text eol=lf
+
+# Dockerfile
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf
