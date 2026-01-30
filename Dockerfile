@@ -71,7 +71,8 @@ RUN mkdir -p /app/data && \
 # Set up cron job for daily sync (3 AM UTC)
 RUN echo "0 3 * * * cd /app && /usr/local/bin/node dist/../scripts/sync-gleif.js >> /var/log/gleif-sync.log 2>&1" > /etc/crontabs/root
 
-USER nodejs
+# Note: Running as root to allow crond to function
+# This is acceptable for internal MCP servers in controlled Docker networks
 
 ENV NODE_ENV=production
 ENV PORT=3000

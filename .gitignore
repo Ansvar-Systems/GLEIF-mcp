@@ -1,18 +1,48 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
 *.tsbuildinfo
-.DS_Store
 
 # Database files (will be built from source)
 data/*.db
 data/*.db-shm
 data/*.db-wal
 data/*.csv
+data/*.zip
+
+# Environment
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Logs
 *.log
 npm-debug.log*
 
-# Environment
-.env
-.env.local
+# Test coverage
+coverage/
+
+# Internal documentation and work-in-progress
+internal/
+
+# MCP Registry tokens and local configs
+.mcpregistry_*
+.playwright-mcp/
+.serena/
+
+# Git worktrees (isolated feature branches)
+.worktrees/
+.dev.vars
+.wrangler/

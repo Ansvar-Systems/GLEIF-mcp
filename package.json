@@ -1,7 +1,7 @@
 {
   "name": "@ansvar/gleif-mcp",
   "version": "1.0.0",
-  "description": "Offline-first GLEIF MCP server for Legal Entity Identifier (LEI) verification. Self-contained SQLite database with 2.1M LEI records and daily sync.",
+  "description": "Offline-first GLEIF MCP server for Legal Entity Identifier (LEI) verification. Self-contained SQLite database with 3.2M LEI records and daily sync.",
   "main": "dist/index.js",
   "type": "module",
   "bin": {
@@ -16,6 +16,7 @@
     "start:http": "node dist/http-server.js",
     "build:db": "tsx scripts/build-db.ts",
     "sync": "tsx scripts/sync-gleif.ts",
+    "test": "node test-production.mjs",
     "prepare": "test -f dist/index.js || npm run build"
   },
   "keywords": [
