@@ -1,0 +1,29 @@
+node_modules
+dist
+*.tsbuildinfo
+.git
+.gitignore
+.DS_Store
+
+# Database files (will be built in container)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/*.csv
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+
+# Documentation
+*.md
+!README.md
+
+# Tests
+tests
+*.test.ts
+*.spec.ts

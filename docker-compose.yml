@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  gleif-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gleif-mcp
+    environment:
+      PORT: "3000"
+      GLEIF_DB_PATH: "/app/data/gleif.db"
+      NODE_ENV: "production"
+    ports:
+      - "8303:3000"
+    volumes:
+      # Persist database across container restarts
+      - gleif-data:/app/data
+      # Mount logs for debugging
+      - gleif-logs:/var/log
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - mcp-network
+
+volumes:
+  gleif-data:
+    driver: local
+  gleif-logs:
+    driver: local
+
+networks:
+  mcp-network:
+    driver: bridge
