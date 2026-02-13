@@ -1,0 +1,49 @@
+{
+  "manifest_version": "0.3",
+  "name": "gleif-mcp",
+  "display_name": "GLEIF LEI Verification MCP Server",
+  "version": "1.0.0",
+  "description": "Offline-first GLEIF MCP server for Legal Entity Identifier (LEI) verification. Self-contained SQLite database with 3.2M LEI records and daily sync.",
+  "author": {
+    "name": "Ansvar Systems",
+    "email": "hello@ansvar.eu",
+    "url": "https://ansvar.eu"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ansvar-Systems/GLEIF-MCP"
+  },
+  "homepage": "https://ansvar.eu",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "gleif",
+    "lei",
+    "legal-entity-identifier",
+    "banking",
+    "compliance",
+    "offline-first",
+    "sqlite"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js"],
+      "env": {}
+    }
+  },
+  "tools": [
+    { "name": "verify_lei" },
+    { "name": "search_entity" },
+    { "name": "get_health" }
+  ],
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}
