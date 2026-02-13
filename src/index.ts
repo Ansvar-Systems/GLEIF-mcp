@@ -9,7 +9,7 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import Database from 'better-sqlite3';
+import Database from '@ansvar/mcp-sqlite';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 

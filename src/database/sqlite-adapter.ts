@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3';
+import type Database from '@ansvar/mcp-sqlite';
 import type {
   DatabaseAdapter,
   LEIRecord,
@@ -11,7 +11,7 @@ import type {
  * SQLite adapter for GLEIF MCP
  * Provides read-only access to local LEI database
  */
-export function createSqliteAdapter(db: Database.Database): DatabaseAdapter {
+export function createSqliteAdapter(db: InstanceType<typeof Database>): DatabaseAdapter {
   return {
     type: 'sqlite' as const,
 
