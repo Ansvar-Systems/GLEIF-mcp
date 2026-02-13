@@ -4,7 +4,7 @@
  * Comprehensive test of all GLEIF MCP tools
  */
 
-import Database from 'better-sqlite3';
+import Database from '@ansvar/mcp-sqlite';
 import { createSqliteAdapter } from './dist/database/sqlite-adapter.js';
 import { verifyLEI } from './dist/tools/verify-lei.js';
 import { searchEntity } from './dist/tools/search-entity.js';

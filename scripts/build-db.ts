@@ -7,7 +7,7 @@
  * Run with: npm run build:db
  */
 
-import Database from 'better-sqlite3';
+import Database from '@ansvar/mcp-sqlite';
 import {
   readFileSync,
   existsSync,
@@ -165,7 +165,7 @@ async function extractZIP(): Promise<void> {
 /**
  * Initialize database with schema
  */
-function initializeDatabase(db: Database.Database): void {
+function initializeDatabase(db: InstanceType<typeof Database>): void {
   console.log('🗄️  Initializing database schema...');
 
   const schemaPath = join(__dirname, '..', 'src', 'database', 'schema.sql');
@@ -247,7 +247,7 @@ function hasBalancedQuotes(line: string): boolean {
 /**
  * Parse CSV and load into database
  */
-async function loadData(db: Database.Database, context: BuildContext): Promise<number> {
+async function loadData(db: InstanceType<typeof Database>, context: BuildContext): Promise<number> {
   console.log('📊 Loading data into database (this will take 5-15 minutes)...');
 
   const syncStmt = db.prepare(`

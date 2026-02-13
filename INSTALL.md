@@ -1,12 +1,11 @@
 # GLEIF MCP - Installation Guide
 
-## Quick Install for Claude Desktop
+## Prerequisites
+- Node.js 18+
+- npm
+- (Optional) Docker / Docker Compose
 
-### Prerequisites
-- Node.js 18+ installed
-- Claude Desktop app
-
-### Step 1: Build the Project
+## Local Setup
 
 ```bash
 cd /Users/jeffreyvonrotz/Projects/GLEIF-mcp
@@ -14,21 +13,29 @@ npm install
 npm run build
 ```
 
-### Step 2: Choose Database Option
+## Database Options
 
-**Option A: Test Database (Quick - 30 seconds)**
-```bash
-npx tsx scripts/create-test-db.ts
-```
-Creates database with 10 sample entities (Apple, JPMorgan, Deutsche Bank, etc.)
+### Option A: Production database (recommended)
 
-**Option B: Full Production Database (10-15 minutes)**
 ```bash
 npm run build:db
 ```
-Downloads and processes 3.2M real LEI records from GLEIF (~443MB download)
 
-### Step 3: Configure Claude Desktop
+Builds `data/gleif.db` from GLEIF Golden Copy data.
+
+### Option B: Test database (development only)
+
+```bash
+node --import tsx scripts/create-test-db.ts
+```
+
+Creates a 10-row sample DB. By default, the server will refuse to start with this DB unless you set:
+
+```bash
+export GLEIF_ALLOW_INCOMPLETE_DB=true
+```
+
+## Claude Desktop Configuration
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
@@ -37,9 +44,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "gleif": {
       "command": "node",
-      "args": [
-        "/Users/jeffreyvonrotz/Projects/GLEIF-mcp/dist/index.js"
-      ],
+      "args": ["/Users/jeffreyvonrotz/Projects/GLEIF-mcp/dist/index.js"],
       "env": {
         "GLEIF_DB_PATH": "/Users/jeffreyvonrotz/Projects/GLEIF-mcp/data/gleif.db"
       }
@@ -48,79 +53,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-### Step 4: Restart Claude Desktop
-
-Quit and reopen Claude Desktop. The GLEIF MCP server will appear in the available tools.
-
-## Testing
-
-### Run Test Suite
-```bash
-node test-all-tools.mjs
-```
-
-Should show: `🎉 All tests passed! GLEIF MCP Server is 100% functional`
-
-### Test in Claude Desktop
-
-Try these queries:
-- "Verify the LEI for Apple Inc: 549300XQFX8FNB77HY47"
-- "Search for entities with 'bank' in their name"
-- "Check the GLEIF database health status"
-
-## Available Tools
-
-### 1. verify_lei
-Verify a Legal Entity Identifier and return full entity details.
-
-**Example:**
-```
-Verify LEI: 549300XQFX8FNB77HY47
-```
-
-**Response includes:**
-- Legal name
-- Registration status
-- Jurisdiction
-- Legal address (full)
-- Headquarters address
-- Registration dates
-- Managing LOU
-
-### 2. search_entity
-Search for entities by name (full-text search).
-
-**Example:**
-```
-Search for companies with "Deutsche Bank" in their name
-```
-
-**Parameters:**
-- `entity_name`: Name or partial name to search
-- `limit`: Max results (default 10, max 100)
-
-### 3. get_health
-Get server and database health status.
-
-**Returns:**
-- Entity count
-- Last sync timestamp
-- Data age in hours
-- Freshness status (current/stale/critical)
-- Database version
-
-## Database Info
-
-**Test Database:**
-- 10 sample entities
-- Companies: Apple, JPMorgan, Deutsche Bank, Goldman Sachs, Microsoft, Tesla, HSBC, Barclays, BNP Paribas, Amazon
-- Perfect for development and testing
-
-**Production Database:**
-- 3,195,676 entities (as of 2026-01-30)
-- 443MB download (zipped)
-- ~800MB SQLite database
-- Daily sync via cron (Docker deployment)
+Restart Claude Desktop after changes.
 
 ## Docker Deployment
 
@@ -128,24 +61,58 @@ Get server and database health status.
 docker-compose up -d
 ```
 
-Server available at: `http://localhost:8303`
+Service endpoint: `http://localhost:8303`
+
+## Sync and Maintenance
+
+Manual sync check/rebuild:
+
+```bash
+npm run sync
+```
+
+Behavior:
+- Checks latest publish metadata when reachable
+- Rebuilds when a newer publish is available
+- Rebuilds when local completeness/readiness checks fail
+
+## Validation
+
+Run production checks:
+
+```bash
+npm test
+```
+
+Expected outcomes:
+- `get_health` shows `production_ready: true`
+- `entity_count` is in the 3.2M range
+- `freshness_status` is `current` (when recently synced)
 
 ## Troubleshooting
 
-**Server won't start:**
-- Check Node.js version: `node --version` (need 18+)
-- Verify database exists: `ls -lh data/gleif.db`
-- Check Claude Desktop logs
+### Server fails with "Database is not production-ready"
+This means DB is too small/incomplete for production.
 
-**No results in searches:**
-- Verify database was created: `sqlite3 data/gleif.db "SELECT COUNT(*) FROM entities;"`
-- Should show at least 10 (test DB) or 3M+ (production DB)
+Fix:
+```bash
+npm run build:db
+```
 
-**Out of date warnings:**
-- Run `npm run sync` to update from GLEIF delta files
-- Or rebuild: `npm run build:db`
+Temporary local override only:
+```bash
+export GLEIF_ALLOW_INCOMPLETE_DB=true
+```
+
+### Sync metadata fetch fails in restricted networks
+If internet egress is blocked, sync still validates local completeness but cannot compare to latest publish metadata.
+
+### Verify row count quickly
+
+```bash
+sqlite3 data/gleif.db "SELECT COUNT(*) FROM entities;"
+```
 
 ## Support
-
-- Issues: https://github.com/Ansvar-Systems/GLEIF-MCP/issues
-- GLEIF Data: https://www.gleif.org/en/lei-data/gleif-concatenated-file/
+- Repo: https://github.com/Ansvar-Systems/GLEIF-mcp
+- GLEIF data docs: https://goldencopy.gleif.org/api/v2/docs

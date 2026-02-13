@@ -235,10 +235,10 @@ UPDATE metadata SET value = 'false' WHERE key = 'sync_enabled';
 
 ## Database Schema
 
-- **entities**: 2.1M LEI records with full details
+- **entities**: 3.2M+ LEI records with full details
 - **entities_fts**: FTS5 full-text search index
 - **sync_log**: Audit trail of all sync operations
-- **metadata**: System state (sync_enabled, last_sync, etc.)
+- **metadata**: System state (`sync_enabled`, `last_full_sync`, `expected_entities`, `source_publish_date`, etc.)
 
 ## Configuration
 

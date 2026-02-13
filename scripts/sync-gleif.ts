@@ -5,7 +5,7 @@
  * Current strategy: metadata-aware full rebuild when new data exists or local DB is incomplete.
  */
 
-import Database from 'better-sqlite3';
+import Database from '@ansvar/mcp-sqlite';
 import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';

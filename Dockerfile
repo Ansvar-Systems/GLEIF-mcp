@@ -5,9 +5,6 @@
 # Build stage
 FROM --platform=linux/amd64 node:20-alpine AS builder
 
-# Install build tools for native modules
-RUN apk add --no-cache python3 make g++
-
 WORKDIR /app
 
 # Copy package files
@@ -29,9 +26,6 @@ FROM --platform=linux/amd64 node:20-alpine AS production
 
 # Install runtime dependencies and cron
 RUN apk add --no-cache \
-    python3 \
-    make \
-    g++ \
     dcron \
     curl
 
@@ -43,9 +37,8 @@ COPY package.json package-lock.json* ./
 # Install production dependencies only
 RUN npm ci --only=production --ignore-scripts
 
-# Clean up build tools
-RUN apk del python3 make g++ && \
-    npm cache clean --force
+# Clean up npm cache
+RUN npm cache clean --force
 
 # Security: create non-root user
 RUN addgroup -g 1001 -S nodejs && \
@@ -63,7 +56,7 @@ RUN mkdir -p /app/data && \
     chown -R nodejs:nodejs /app
 
 # Set up cron job for daily sync (3 AM UTC)
-RUN echo "0 3 * * * cd /app && /usr/local/bin/node dist/../scripts/sync-gleif.js >> /var/log/gleif-sync.log 2>&1" > /etc/crontabs/root
+RUN echo "0 3 * * * cd /app && /usr/local/bin/npm run sync >> /var/log/gleif-sync.log 2>&1" > /etc/crontabs/root
 
 # Note: Running as root to allow crond to function
 # This is acceptable for internal MCP servers in controlled Docker networks

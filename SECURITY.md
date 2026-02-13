@@ -68,7 +68,7 @@ The GLEIF database (`data/gleif.db`) is:
 ## Third-Party Dependencies
 
 We minimize dependencies and regularly audit:
-- **Core runtime**: Node.js, TypeScript, better-sqlite3
+- **Core runtime**: Node.js, TypeScript, @ansvar/mcp-sqlite
 - **MCP SDK**: Official Anthropic package
 - **No unnecessary dependencies**
 
