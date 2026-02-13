@@ -7,6 +7,36 @@ import type {
   SyncLogEntry,
 } from './types.js';
 
+const MIN_PRODUCTION_ENTITY_COUNT = Number.parseInt(process.env.GLEIF_MIN_ENTITY_COUNT || '1000000', 10);
+const MIN_COMPLETENESS_RATIO = 0.98;
+
+function parseExpectedEntityCount(value: string | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function buildFtsPrefixQuery(input: string): string {
+  const tokens = input
+    .trim()
+    .split(/\s+/)
+    .map(token => token.replace(/[^\p{L}\p{N}]+/gu, ''))
+    .filter(token => token.length > 0);
+
+  if (tokens.length === 0) {
+    return input.replace(/"/g, '""');
+  }
+
+  return tokens.map(token => `${token}*`).join(' ');
+}
+
 /**
  * SQLite adapter for GLEIF MCP
  * Provides read-only access to local LEI database
@@ -28,29 +58,62 @@ export function createSqliteAdapter(db: InstanceType<typeof Database>): Database
     },
 
     searchEntity(name: string, limit: number = 10): SearchResult {
-      // Use FTS5 for full-text search
       const searchQuery = name.trim();
+      const safeLimit = Math.max(1, Math.min(100, limit));
 
       if (!searchQuery) {
         return { results: [], total: 0 };
       }
 
-      // FTS5 MATCH query with ranking
-      const stmt = db.prepare(`
-        SELECT e.*
-        FROM entities_fts fts
-        INNER JOIN entities e ON e.rowid = fts.rowid
-        WHERE fts.legal_name MATCH ?
-        ORDER BY rank
-        LIMIT ?
-      `);
+      const ftsQuery = buildFtsPrefixQuery(searchQuery);
 
-      const rows = stmt.all(searchQuery, limit);
+      try {
+        const stmt = db.prepare(`
+          SELECT e.*
+          FROM entities_fts fts
+          INNER JOIN entities e ON e.rowid = fts.rowid
+          WHERE fts.legal_name MATCH ?
+          ORDER BY rank
+          LIMIT ?
+        `);
 
-      return {
-        results: rows as LEIRecord[],
-        total: rows.length,
-      };
+        const totalStmt = db.prepare(`
+          SELECT COUNT(*) as count
+          FROM entities_fts
+          WHERE legal_name MATCH ?
+        `);
+
+        const rows = stmt.all(ftsQuery, safeLimit);
+        const totalRow = totalStmt.get(ftsQuery) as { count: number };
+
+        return {
+          results: rows as LEIRecord[],
+          total: totalRow.count,
+        };
+      } catch {
+        // Fallback for user queries containing unsupported FTS syntax characters.
+        const likeQuery = `%${searchQuery.toLowerCase()}%`;
+        const fallbackStmt = db.prepare(`
+          SELECT *
+          FROM entities
+          WHERE legal_name_lower LIKE ?
+          ORDER BY legal_name ASC
+          LIMIT ?
+        `);
+        const fallbackCountStmt = db.prepare(`
+          SELECT COUNT(*) as count
+          FROM entities
+          WHERE legal_name_lower LIKE ?
+        `);
+
+        const rows = fallbackStmt.all(likeQuery, safeLimit);
+        const totalRow = fallbackCountStmt.get(likeQuery) as { count: number };
+
+        return {
+          results: rows as LEIRecord[],
+          total: totalRow.count,
+        };
+      }
     },
 
     getHealth(): HealthStatus {
@@ -93,8 +156,27 @@ export function createSqliteAdapter(db: InstanceType<typeof Database>): Database
         metadataRows.map(row => [row.key, row.value])
       );
 
+      const expectedEntityCount = parseExpectedEntityCount(metadata.expected_entities);
+      const coverageRatio = expectedEntityCount ? entityCount / expectedEntityCount : null;
+
+      let dataQualityStatus: 'ok' | 'incomplete' | 'unknown' = 'unknown';
+      let productionReady = false;
+
+      if (expectedEntityCount) {
+        const completeEnough = coverageRatio !== null && coverageRatio >= MIN_COMPLETENESS_RATIO;
+        productionReady = completeEnough && entityCount >= MIN_PRODUCTION_ENTITY_COUNT;
+        dataQualityStatus = productionReady ? 'ok' : 'incomplete';
+      } else if (entityCount >= MIN_PRODUCTION_ENTITY_COUNT) {
+        productionReady = true;
+        dataQualityStatus = 'ok';
+      }
+
       return {
         entity_count: entityCount,
+        expected_entity_count: expectedEntityCount,
+        coverage_ratio: coverageRatio,
+        production_ready: productionReady,
+        data_quality_status: dataQualityStatus,
         last_sync: syncRow?.completed_at || null,
         data_age_hours: dataAgeHours,
         freshness_status: freshnessStatus,

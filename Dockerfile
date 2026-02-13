@@ -16,9 +16,6 @@ COPY package.json package-lock.json* ./
 # Install dependencies
 RUN npm ci --ignore-scripts
 
-# Rebuild better-sqlite3 for build platform
-RUN cd node_modules/better-sqlite3 && npm run install
-
 # Copy source code
 COPY tsconfig.json ./
 COPY src/ ./src/
@@ -45,9 +42,6 @@ COPY package.json package-lock.json* ./
 
 # Install production dependencies only
 RUN npm ci --only=production --ignore-scripts
-
-# Rebuild better-sqlite3 for production platform
-RUN cd node_modules/better-sqlite3 && npm run install
 
 # Clean up build tools
 RUN apk del python3 make g++ && \

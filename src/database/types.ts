@@ -57,6 +57,10 @@ export interface SyncLogEntry {
 
 export interface HealthStatus {
   entity_count: number;
+  expected_entity_count: number | null;
+  coverage_ratio: number | null;
+  production_ready: boolean;
+  data_quality_status: 'ok' | 'incomplete' | 'unknown';
   last_sync: string | null;
   data_age_hours: number | null;
   freshness_status: 'current' | 'stale' | 'critical' | 'never_synced';

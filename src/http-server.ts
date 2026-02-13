@@ -17,6 +17,7 @@ import { randomUUID } from 'crypto';
 
 import { registerTools } from './tools/registry.js';
 import { createSqliteAdapter } from './database/sqlite-adapter.js';
+import { assertProductionReadyDatabase } from './database/readiness.js';
 import type { DatabaseAdapter } from './database/types.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -34,6 +35,7 @@ function getDatabase(): DatabaseAdapter {
   if (!db) {
     try {
       const sqliteDb = new Database(DB_PATH, { readonly: true });
+      assertProductionReadyDatabase(sqliteDb);
       db = createSqliteAdapter(sqliteDb);
     } catch (error) {
       throw new Error(`Failed to open database at ${DB_PATH}: ${error}`);

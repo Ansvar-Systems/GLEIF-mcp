@@ -8,7 +8,14 @@
  */
 
 import Database from 'better-sqlite3';
-import { readFileSync, existsSync, mkdirSync, createWriteStream, createReadStream, unlinkSync } from 'fs';
+import {
+  readFileSync,
+  existsSync,
+  mkdirSync,
+  createWriteStream,
+  createReadStream,
+  unlinkSync,
+} from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { pipeline } from 'stream/promises';
@@ -22,12 +29,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const DATA_DIR = join(__dirname, '..', 'data');
-const DB_PATH = join(DATA_DIR, 'gleif.db');
-const ZIP_PATH = join(DATA_DIR, 'gleif-download.csv.zip');
-const CSV_PATH = join(DATA_DIR, 'gleif-download.csv');
+const DB_PATH = process.env.GLEIF_DB_PATH || join(DATA_DIR, 'gleif.db');
+const DEFAULT_ZIP_PATH = join(DATA_DIR, 'gleif-download.csv.zip');
+const DEFAULT_CSV_PATH = join(DATA_DIR, 'gleif-download.csv');
 
-// GLEIF Golden Copy API v2
+const ZIP_PATH = process.env.GLEIF_SOURCE_ZIP_PATH || DEFAULT_ZIP_PATH;
+const CSV_PATH = process.env.GLEIF_SOURCE_CSV_PATH || DEFAULT_CSV_PATH;
+
 const GLEIF_API_URL = 'https://goldencopy.gleif.org/api/v2/golden-copies/publishes/lei2/latest';
+const MIN_COMPLETENESS_RATIO = 0.98;
 
 interface GLEIFMetadata {
   data: {
@@ -41,6 +51,43 @@ interface GLEIFMetadata {
       };
     };
   };
+}
+
+interface BuildContext {
+  sourceUrl: string;
+  publishedAt: string;
+  expectedRecordCount: number | null;
+}
+
+interface ColumnMap {
+  lei: number;
+  legalName: number;
+  registrationStatus?: number;
+  legalJurisdiction?: number;
+  entityCategory?: number;
+  legalAddressLine1?: number;
+  legalAddressLine2?: number;
+  legalAddressCity?: number;
+  legalAddressRegion?: number;
+  legalAddressCountry?: number;
+  legalAddressPostalCode?: number;
+  hqAddressLine1?: number;
+  hqAddressLine2?: number;
+  hqAddressCity?: number;
+  hqAddressRegion?: number;
+  hqAddressCountry?: number;
+  hqAddressPostalCode?: number;
+  initialRegistrationDate?: number;
+  lastUpdateDate?: number;
+  nextRenewalDate?: number;
+  managingLou?: number;
+  entityStatus?: number;
+}
+
+function parseIntOrNull(value: string | undefined): number | null {
+  if (!value) return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 /**
@@ -79,12 +126,10 @@ async function downloadZIP(url: string): Promise<void> {
     throw new Error('No response body');
   }
 
-  // Create data directory if it doesn't exist
   if (!existsSync(DATA_DIR)) {
     mkdirSync(DATA_DIR, { recursive: true });
   }
 
-  // Stream to file
   const fileStream = createWriteStream(ZIP_PATH);
   await pipeline(response.body as any, fileStream);
 
@@ -98,15 +143,16 @@ async function extractZIP(): Promise<void> {
   console.log('📦 Extracting ZIP file...');
 
   try {
-    // Use unzip command (available on macOS/Linux)
     await execAsync(`unzip -o "${ZIP_PATH}" -d "${DATA_DIR}"`);
 
-    // Find the extracted CSV file
     const { stdout } = await execAsync(`ls "${DATA_DIR}"/*.csv | head -1`);
     const extractedFile = stdout.trim();
 
-    if (extractedFile && extractedFile !== CSV_PATH) {
-      // Rename to standard name
+    if (!extractedFile) {
+      throw new Error('No CSV file found after extraction');
+    }
+
+    if (extractedFile !== CSV_PATH) {
       await execAsync(`mv "${extractedFile}" "${CSV_PATH}"`);
     }
 
@@ -130,21 +176,87 @@ function initializeDatabase(db: Database.Database): void {
   console.log('✅ Database schema created');
 }
 
+function getRequiredColumnIndex(headerMap: Map<string, number>, key: string): number {
+  const idx = headerMap.get(key);
+  if (idx === undefined) {
+    throw new Error(`Required CSV column missing: ${key}`);
+  }
+  return idx;
+}
+
+function getOptionalColumnIndex(headerMap: Map<string, number>, key: string): number | undefined {
+  return headerMap.get(key);
+}
+
+function buildColumnMap(headerMap: Map<string, number>): ColumnMap {
+  return {
+    lei: getRequiredColumnIndex(headerMap, 'LEI'),
+    legalName: getRequiredColumnIndex(headerMap, 'Entity.LegalName'),
+    registrationStatus: getOptionalColumnIndex(headerMap, 'Entity.RegistrationStatus'),
+    legalJurisdiction: getOptionalColumnIndex(headerMap, 'Entity.LegalJurisdiction'),
+    entityCategory: getOptionalColumnIndex(headerMap, 'Entity.EntityCategory'),
+    legalAddressLine1: getOptionalColumnIndex(headerMap, 'Entity.LegalAddress.FirstAddressLine'),
+    legalAddressLine2: getOptionalColumnIndex(headerMap, 'Entity.LegalAddress.AdditionalAddressLine'),
+    legalAddressCity: getOptionalColumnIndex(headerMap, 'Entity.LegalAddress.City'),
+    legalAddressRegion: getOptionalColumnIndex(headerMap, 'Entity.LegalAddress.Region'),
+    legalAddressCountry: getOptionalColumnIndex(headerMap, 'Entity.LegalAddress.Country'),
+    legalAddressPostalCode: getOptionalColumnIndex(headerMap, 'Entity.LegalAddress.PostalCode'),
+    hqAddressLine1: getOptionalColumnIndex(headerMap, 'Entity.HeadquartersAddress.FirstAddressLine'),
+    hqAddressLine2: getOptionalColumnIndex(headerMap, 'Entity.HeadquartersAddress.AdditionalAddressLine'),
+    hqAddressCity: getOptionalColumnIndex(headerMap, 'Entity.HeadquartersAddress.City'),
+    hqAddressRegion: getOptionalColumnIndex(headerMap, 'Entity.HeadquartersAddress.Region'),
+    hqAddressCountry: getOptionalColumnIndex(headerMap, 'Entity.HeadquartersAddress.Country'),
+    hqAddressPostalCode: getOptionalColumnIndex(headerMap, 'Entity.HeadquartersAddress.PostalCode'),
+    initialRegistrationDate: getOptionalColumnIndex(headerMap, 'Registration.InitialRegistrationDate'),
+    lastUpdateDate: getOptionalColumnIndex(headerMap, 'Registration.LastUpdateDate'),
+    nextRenewalDate: getOptionalColumnIndex(headerMap, 'Registration.NextRenewalDate'),
+    managingLou: getOptionalColumnIndex(headerMap, 'Registration.ManagingLOU'),
+    entityStatus: getOptionalColumnIndex(headerMap, 'Entity.EntityStatus'),
+  };
+}
+
+function valueAt(values: string[], idx: number | undefined): string | null {
+  if (idx === undefined) return null;
+  const value = values[idx];
+  if (value === undefined) return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function hasBalancedQuotes(line: string): boolean {
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+
+    if (char !== '"') {
+      continue;
+    }
+
+    if (inQuotes && line[i + 1] === '"') {
+      i++;
+      continue;
+    }
+
+    inQuotes = !inQuotes;
+  }
+
+  return !inQuotes;
+}
+
 /**
  * Parse CSV and load into database
  */
-async function loadData(db: Database.Database, publishedAt: string): Promise<number> {
-  console.log('📊 Loading data into database (this will take 5-10 minutes)...');
+async function loadData(db: Database.Database, context: BuildContext): Promise<number> {
+  console.log('📊 Loading data into database (this will take 5-15 minutes)...');
 
-  // Log sync start
   const syncStmt = db.prepare(`
     INSERT INTO sync_log (sync_type, started_at, status, source_url)
     VALUES (?, ?, ?, ?)
   `);
-  const syncResult = syncStmt.run('full', new Date().toISOString(), 'running', GLEIF_API_URL);
+  const syncResult = syncStmt.run('full', new Date().toISOString(), 'running', context.sourceUrl);
   const syncId = syncResult.lastInsertRowid as number;
 
-  // Prepare insert statement
   const insertStmt = db.prepare(`
     INSERT OR REPLACE INTO entities (
       lei,
@@ -175,8 +287,11 @@ async function loadData(db: Database.Database, publishedAt: string): Promise<num
   `);
 
   let count = 0;
+  let malformedRows = 0;
   let headerParsed = false;
   let headerMap: Map<string, number> = new Map();
+  let columnMap: ColumnMap | null = null;
+  let pendingRecord = '';
 
   db.exec('BEGIN TRANSACTION');
 
@@ -188,61 +303,70 @@ async function loadData(db: Database.Database, publishedAt: string): Promise<num
     });
 
     for await (const line of rl) {
-      // Parse header
+      pendingRecord = pendingRecord.length > 0 ? `${pendingRecord}\n${line}` : line;
+
+      if (!hasBalancedQuotes(pendingRecord)) {
+        continue;
+      }
+
+      const record = pendingRecord;
+      pendingRecord = '';
+
       if (!headerParsed) {
-        const headers = parseCSVLine(line);
+        const headers = parseCSVLine(record);
+        if (headers.length > 0) {
+          headers[0] = headers[0].replace(/^\uFEFF/, '');
+        }
         headers.forEach((header, index) => {
           headerMap.set(header, index);
         });
+
+        columnMap = buildColumnMap(headerMap);
         headerParsed = true;
         console.log(`   Found ${headers.length} columns in CSV`);
         continue;
       }
 
-      // Parse data row
-      const values = parseCSVLine(line);
+      const values = parseCSVLine(record);
 
-      if (values.length < 10) {
-        // Skip malformed rows
+      if (values.length < 10 || !columnMap) {
+        malformedRows++;
         continue;
       }
 
-      const lei = values[headerMap.get('LEI') || 0] || '';
-      const legalName = values[headerMap.get('Entity.LegalName') || 1] || '';
+      const lei = valueAt(values, columnMap.lei);
+      const legalName = valueAt(values, columnMap.legalName);
 
       if (!lei || !legalName) {
+        malformedRows++;
         continue;
       }
 
-      // Extract fields based on GLEIF CSV structure
       insertStmt.run(
         lei,
         legalName,
         legalName.toLowerCase(),
-        values[headerMap.get('Entity.RegistrationStatus') || 2] || 'UNKNOWN',
-        values[headerMap.get('Entity.LegalJurisdiction') || 3] || null,
-        values[headerMap.get('Entity.EntityCategory') || 4] || null,
-        // Legal Address
-        values[headerMap.get('Entity.LegalAddress.FirstAddressLine') || 5] || null,
-        values[headerMap.get('Entity.LegalAddress.AdditionalAddressLine') || 6] || null,
-        values[headerMap.get('Entity.LegalAddress.City') || 7] || null,
-        values[headerMap.get('Entity.LegalAddress.Region') || 8] || null,
-        values[headerMap.get('Entity.LegalAddress.Country') || 9] || null,
-        values[headerMap.get('Entity.LegalAddress.PostalCode') || 10] || null,
-        // HQ Address
-        values[headerMap.get('Entity.HeadquartersAddress.FirstAddressLine') || 11] || null,
-        values[headerMap.get('Entity.HeadquartersAddress.AdditionalAddressLine') || 12] || null,
-        values[headerMap.get('Entity.HeadquartersAddress.City') || 13] || null,
-        values[headerMap.get('Entity.HeadquartersAddress.Region') || 14] || null,
-        values[headerMap.get('Entity.HeadquartersAddress.Country') || 15] || null,
-        values[headerMap.get('Entity.HeadquartersAddress.PostalCode') || 16] || null,
-        // Registration dates
-        values[headerMap.get('Registration.InitialRegistrationDate') || 17] || null,
-        values[headerMap.get('Registration.LastUpdateDate') || 18] || null,
-        values[headerMap.get('Registration.NextRenewalDate') || 19] || null,
-        values[headerMap.get('Registration.ManagingLOU') || 20] || null,
-        values[headerMap.get('Entity.EntityStatus') || 21] || null,
-        values[headerMap.get('Entity.EntityCategory') || 4] || null
+        valueAt(values, columnMap.registrationStatus) || 'UNKNOWN',
+        valueAt(values, columnMap.legalJurisdiction),
+        valueAt(values, columnMap.entityCategory),
+        valueAt(values, columnMap.legalAddressLine1),
+        valueAt(values, columnMap.legalAddressLine2),
+        valueAt(values, columnMap.legalAddressCity),
+        valueAt(values, columnMap.legalAddressRegion),
+        valueAt(values, columnMap.legalAddressCountry),
+        valueAt(values, columnMap.legalAddressPostalCode),
+        valueAt(values, columnMap.hqAddressLine1),
+        valueAt(values, columnMap.hqAddressLine2),
+        valueAt(values, columnMap.hqAddressCity),
+        valueAt(values, columnMap.hqAddressRegion),
+        valueAt(values, columnMap.hqAddressCountry),
+        valueAt(values, columnMap.hqAddressPostalCode),
+        valueAt(values, columnMap.initialRegistrationDate),
+        valueAt(values, columnMap.lastUpdateDate),
+        valueAt(values, columnMap.nextRenewalDate),
+        valueAt(values, columnMap.managingLou),
+        valueAt(values, columnMap.entityStatus),
+        valueAt(values, columnMap.entityCategory)
       );
 
       count++;
@@ -252,20 +376,42 @@ async function loadData(db: Database.Database, publishedAt: string): Promise<num
       }
     }
 
-    db.exec('COMMIT');
+    if (pendingRecord.trim().length > 0) {
+      console.warn('⚠️  Trailing partial CSV record detected and skipped');
+      malformedRows++;
+    }
 
-    // Update metadata
+    if (context.expectedRecordCount && context.expectedRecordCount > 0) {
+      const completeness = count / context.expectedRecordCount;
+      if (completeness < MIN_COMPLETENESS_RATIO) {
+        throw new Error(
+          `Ingestion completeness check failed: loaded ${count.toLocaleString()} / expected ${context.expectedRecordCount.toLocaleString()} (${(completeness * 100).toFixed(2)}%)`
+        );
+      }
+    }
+
     db.prepare("UPDATE metadata SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = 'total_entities'").run(
       count.toString()
     );
     db.prepare("UPDATE metadata SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = 'last_full_sync'").run(
-      publishedAt
+      context.publishedAt
+    );
+    db.prepare("UPDATE metadata SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = 'expected_entities'").run(
+      (context.expectedRecordCount || count).toString()
+    );
+    db.prepare("UPDATE metadata SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = 'source_publish_date'").run(
+      context.publishedAt
     );
 
-    // Update sync log
+    db.exec('COMMIT');
+
     db.prepare(
       'UPDATE sync_log SET completed_at = ?, status = ?, records_added = ? WHERE id = ?'
     ).run(new Date().toISOString(), 'success', count, syncId);
+
+    if (malformedRows > 0) {
+      console.warn(`⚠️  Skipped ${malformedRows.toLocaleString()} malformed/incomplete CSV rows`);
+    }
 
     console.log(`✅ Successfully loaded ${count.toLocaleString()} entities`);
 
@@ -273,7 +419,6 @@ async function loadData(db: Database.Database, publishedAt: string): Promise<num
   } catch (error) {
     db.exec('ROLLBACK');
 
-    // Log sync failure
     db.prepare('UPDATE sync_log SET status = ?, error_message = ? WHERE id = ?').run(
       'failed',
       error instanceof Error ? error.message : 'Unknown error',
@@ -285,7 +430,7 @@ async function loadData(db: Database.Database, publishedAt: string): Promise<num
 }
 
 /**
- * Simple CSV line parser (handles quoted fields)
+ * Simple CSV parser (handles quoted fields and escaped quotes)
  */
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
@@ -297,15 +442,12 @@ function parseCSVLine(line: string): string[] {
 
     if (char === '"') {
       if (inQuotes && line[i + 1] === '"') {
-        // Escaped quote
         current += '"';
         i++;
       } else {
-        // Toggle quotes
         inQuotes = !inQuotes;
       }
     } else if (char === ',' && !inQuotes) {
-      // Field separator
       result.push(current);
       current = '';
     } else {
@@ -313,7 +455,6 @@ function parseCSVLine(line: string): string[] {
     }
   }
 
-  // Push last field
   result.push(current);
 
   return result;
@@ -326,19 +467,63 @@ async function main() {
   console.log('🚀 GLEIF Database Builder');
   console.log('═══════════════════════════════════════\n');
 
+  const skipDownload = process.env.GLEIF_SKIP_DOWNLOAD === 'true';
+  const keepSourceFiles = process.env.GLEIF_KEEP_SOURCE_FILES === 'true';
+
+  let downloadedZip = false;
+  let extractedCsv = false;
+
   try {
-    // Step 1: Fetch metadata
-    const metadata = await fetchMetadata();
-    const csvUrl = metadata.data.full_file.csv.url;
-    const publishedAt = metadata.data.publish_date;
+    let metadata: GLEIFMetadata | null = null;
 
-    // Step 2: Download ZIP
-    await downloadZIP(csvUrl);
+    if (!skipDownload) {
+      try {
+        metadata = await fetchMetadata();
+      } catch (error) {
+        if (!existsSync(CSV_PATH) && !existsSync(ZIP_PATH)) {
+          throw error;
+        }
+        console.warn(
+          `⚠️  Metadata fetch failed (${error instanceof Error ? error.message : 'unknown'}). Continuing with local snapshot.`
+        );
+      }
+    } else {
+      console.log('ℹ️  GLEIF_SKIP_DOWNLOAD=true, using local CSV/ZIP snapshot only');
+    }
 
-    // Step 3: Extract ZIP
-    await extractZIP();
+    if (!existsSync(CSV_PATH)) {
+      if (existsSync(ZIP_PATH)) {
+        await extractZIP();
+        extractedCsv = true;
+      } else {
+        if (!metadata) {
+          throw new Error(
+            `No local CSV/ZIP found and metadata unavailable. Expected CSV at ${CSV_PATH} or ZIP at ${ZIP_PATH}`
+          );
+        }
 
-    // Step 4: Initialize database
+        await downloadZIP(metadata.data.full_file.csv.url);
+        downloadedZip = true;
+        await extractZIP();
+        extractedCsv = true;
+      }
+    } else {
+      console.log(`ℹ️  Using existing local CSV at ${CSV_PATH}`);
+    }
+
+    const inferredPublishDate = new Date().toISOString();
+    const expectedFromEnv = parseIntOrNull(process.env.GLEIF_EXPECTED_RECORD_COUNT);
+
+    const context: BuildContext = {
+      sourceUrl: metadata?.data.full_file.csv.url || `file://${CSV_PATH}`,
+      publishedAt: metadata?.data.publish_date || inferredPublishDate,
+      expectedRecordCount: metadata?.data.full_file.csv.record_count || expectedFromEnv,
+    };
+
+    if (!existsSync(DATA_DIR)) {
+      mkdirSync(DATA_DIR, { recursive: true });
+    }
+
     if (existsSync(DB_PATH)) {
       console.log(`⚠️  Removing existing database at ${DB_PATH}`);
       unlinkSync(DB_PATH);
@@ -347,18 +532,16 @@ async function main() {
     const db = new Database(DB_PATH);
     initializeDatabase(db);
 
-    // Step 5: Load data
-    const totalRecords = await loadData(db, publishedAt);
+    const totalRecords = await loadData(db, context);
 
     db.close();
 
-    // Step 6: Cleanup
     console.log('\n🧹 Cleaning up...');
-    if (existsSync(ZIP_PATH)) {
+    if (!keepSourceFiles && downloadedZip && existsSync(ZIP_PATH)) {
       unlinkSync(ZIP_PATH);
       console.log('✅ ZIP file removed');
     }
-    if (existsSync(CSV_PATH)) {
+    if (!keepSourceFiles && extractedCsv && existsSync(CSV_PATH)) {
       unlinkSync(CSV_PATH);
       console.log('✅ CSV file removed');
     }
@@ -366,6 +549,10 @@ async function main() {
     console.log('\n═══════════════════════════════════════');
     console.log('✨ Database build complete!');
     console.log(`📊 Total entities: ${totalRecords.toLocaleString()}`);
+    if (context.expectedRecordCount) {
+      const pct = (totalRecords / context.expectedRecordCount) * 100;
+      console.log(`📈 Completeness: ${pct.toFixed(2)}% (${totalRecords.toLocaleString()}/${context.expectedRecordCount.toLocaleString()})`);
+    }
     console.log(`💾 Database: ${DB_PATH}`);
     console.log('═══════════════════════════════════════\n');
   } catch (error) {

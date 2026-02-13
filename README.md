@@ -35,11 +35,11 @@ This MCP server makes GLEIF's 3.2M LEI records **searchable, offline, and AI-rea
 - **3,195,676 LEI Records** (as of January 2026) — Apple, Goldman Sachs, Deutsche Bank, and 3.2M more
 - **Full-Text Search** — Find entities across all names instantly via SQLite FTS5
 - **Works Offline** — Self-contained database with last-synced data
-- **Daily Auto-Sync** — Optional scheduled updates from GLEIF Golden Copy
+- **Daily Auto-Sync** — Optional metadata-aware refresh from GLEIF Golden Copy
 - **Audit Trail** — Data freshness tracking via sync_log
 - **Dual Transport** — stdio (Claude Desktop) and HTTP/SSE (Docker deployment)
 
-**Database size:** ~1.5GB | **Coverage:** 235 countries | **Update frequency:** Daily delta files
+**Database size:** ~1.5GB | **Coverage:** 235 countries | **Update frequency:** Daily freshness check + auto-rebuild when new publish is available
 
 ---
 
@@ -61,7 +61,7 @@ This MCP server makes GLEIF's 3.2M LEI records **searchable, offline, and AI-rea
                           │ (When online)
                           ▼
               GLEIF Golden Copy API
-           (Bulk data + Delta files)
+        (Bulk data + publish metadata)
 ```
 
 ---
@@ -206,6 +206,10 @@ Returns:
   "version": "1.0.0",
   "database": {
     "entity_count": 3195676,
+    "expected_entity_count": 3195676,
+    "coverage_ratio": 1.0,
+    "production_ready": true,
+    "data_quality_status": "ok",
     "last_sync": "2026-01-30T00:00:00Z",
     "data_age_hours": 8.2,
     "freshness_status": "current",
@@ -216,7 +220,8 @@ Returns:
 
 ## Sync
 
-The database automatically syncs daily at 3 AM UTC (in Docker).
+The database automatically checks for new GLEIF publishes daily at 3 AM UTC (in Docker).
+If a new publish is detected, or if the local DB fails completeness checks, a full rebuild is triggered.
 
 **Manual sync:**
 ```bash
@@ -241,6 +246,9 @@ UPDATE metadata SET value = 'false' WHERE key = 'sync_enabled';
 
 - `PORT` - HTTP server port (default: 3000)
 - `GLEIF_DB_PATH` - Database file path (default: ./data/gleif.db)
+- `GLEIF_MIN_ENTITY_COUNT` - Minimum row count required for production-readiness checks (default: 1,000,000)
+- `GLEIF_ALLOW_INCOMPLETE_DB` - Set to `true` to bypass readiness checks for local testing only
+- `GLEIF_SKIP_DOWNLOAD` - Set to `true` to build only from local CSV/ZIP snapshots
 - `NODE_ENV` - Environment (production/development)
 
 ### Docker Volumes
@@ -317,9 +325,9 @@ All LEI data is sourced verbatim from the **GLEIF Golden Copy API v2**:
 - **Source:** [GLEIF Golden Copy](https://goldencopy.gleif.org/api/v2/docs) (official public data)
 - **Coverage:** 3,195,676 active LEI records (as of January 2026)
 - **Countries:** 235 jurisdictions worldwide
-- **Update Frequency:** Daily delta files (automated via cron in Docker)
+- **Update Frequency:** Daily freshness checks with metadata-aware rebuilds (automated via cron in Docker)
 - **Database Size:** ~1.5GB SQLite (compressed download: 443MB)
-- **Data Freshness:** Tracked via `metadata.last_sync` and `sync_log` audit trail
+- **Data Freshness:** Tracked via `metadata.last_full_sync`, `metadata.source_publish_date`, and `sync_log` audit trail
 
 **Top 10 Countries by Entity Count:**
 1. United States (342,028)

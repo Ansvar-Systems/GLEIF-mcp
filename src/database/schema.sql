@@ -100,4 +100,6 @@ CREATE TABLE IF NOT EXISTS metadata (
 INSERT OR IGNORE INTO metadata (key, value) VALUES ('sync_enabled', 'true');
 INSERT OR IGNORE INTO metadata (key, value) VALUES ('last_full_sync', '');
 INSERT OR IGNORE INTO metadata (key, value) VALUES ('total_entities', '0');
+INSERT OR IGNORE INTO metadata (key, value) VALUES ('expected_entities', '0');
+INSERT OR IGNORE INTO metadata (key, value) VALUES ('source_publish_date', '');
 INSERT OR IGNORE INTO metadata (key, value) VALUES ('database_version', '1.0.0');
