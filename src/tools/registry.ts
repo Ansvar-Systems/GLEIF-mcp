@@ -24,13 +24,16 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: 'verify_lei',
     description:
-      'Verify a Legal Entity Identifier (LEI) and return full entity details including legal name, addresses, registration status, and managing LOU. Returns NOT_FOUND if LEI does not exist in the local database.',
+      'Verify a Legal Entity Identifier (LEI) against the local GLEIF Golden Copy database (3.2M+ entities, ISO 17442). Returns full entity details: legal name, legal and headquarters addresses, registration status (ISSUED/LAPSED/RETIRED/ANNULLED), jurisdiction, managing LOU, and registration dates.\n\nUse this tool when you have a specific 20-character LEI code and need to confirm it is valid and retrieve entity information. Do NOT use this tool to search by company name — use search_entity instead.\n\nReturns { found: true, lei, entity } on match, or { found: false, message } if the LEI is invalid or not in the database. Data is sourced from the GLEIF Golden Copy (updated daily, CC0 licensed).',
     inputSchema: {
       type: 'object',
       properties: {
         lei: {
           type: 'string',
           description: 'The 20-character LEI code to verify (e.g., "549300XQFX8FNB77HY47")',
+          pattern: '^[A-Za-z0-9]{20}$',
+          minLength: 20,
+          maxLength: 20,
         },
       },
       required: ['lei'],
@@ -43,18 +46,21 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: 'search_entity',
     description:
-      'Search for legal entities by name using full-text search. Returns matching entities with their LEI codes and basic information. Useful for finding the LEI of a company when you only know the name.',
+      'Search for legal entities by name using full-text search across 3.2M+ LEI records. Returns matching entities ranked by relevance with their LEI codes, legal names, addresses, registration status, and jurisdiction.\n\nUse this tool when you know a company or organization name (or partial name) and need to find their LEI. Supports prefix matching — e.g., "Deutsche" will match "Deutsche Bank". For exact LEI lookups, use verify_lei instead.\n\nReturns { results: LEIRecord[], total: number }. Results are ranked by FTS5 relevance. Default limit is 10, maximum 100. Returns empty results (not an error) if no matches found.',
     inputSchema: {
       type: 'object',
       properties: {
         entity_name: {
           type: 'string',
           description: 'The entity name or partial name to search for (e.g., "Apple Inc", "Deutsche Bank")',
+          minLength: 1,
         },
         limit: {
           type: 'number',
           description: 'Maximum number of results to return (default: 10, max: 100)',
           default: 10,
+          minimum: 1,
+          maximum: 100,
         },
       },
       required: ['entity_name'],
@@ -67,7 +73,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: 'get_health',
     description:
-      'Get GLEIF MCP server health status including database freshness, entity count, last sync time, and data age. Use this to check if the local database is up-to-date.',
+      'Get GLEIF MCP server health status including database statistics, data freshness, and sync status. Returns entity count, expected count, coverage ratio, production readiness flag, last sync timestamp, data age in hours, freshness status (current/stale/critical/never_synced), and database version.\n\nUse this tool to check whether the local GLEIF database is up-to-date and production-ready before relying on verify_lei or search_entity results. A freshness_status of "stale" or "critical" means data may be outdated.',
     inputSchema: {
       type: 'object',
       properties: {},
