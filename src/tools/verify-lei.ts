@@ -18,7 +18,7 @@ export async function verifyLEI(
   db: DatabaseAdapter,
   input: VerifyLEIInput
 ): Promise<VerifyLEIOutput> {
-  const { lei } = input;
+  const lei = input.lei ? String(input.lei) : '';
 
   // Validate LEI format (20 alphanumeric characters)
   if (!lei || lei.length !== 20 || !/^[A-Z0-9]{20}$/i.test(lei)) {

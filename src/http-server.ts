@@ -29,6 +29,9 @@ const DB_PATH = process.env.GLEIF_DB_PATH || join(__dirname, '..', 'data', 'glei
 // HTTP server port
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
+// Maximum concurrent MCP sessions
+const MAX_SESSIONS = parseInt(process.env.MAX_SESSIONS || '100', 10);
+
 let db: DatabaseAdapter;
 
 function getDatabase(): DatabaseAdapter {
@@ -80,7 +83,8 @@ async function main() {
         const status = health.freshness_status === 'critical' ? 'degraded'
           : health.freshness_status === 'stale' ? 'stale'
           : 'ok';
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        const httpStatus = status === 'degraded' ? 503 : 200;
+        res.writeHead(httpStatus, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           status,
           server: 'gleif-mcp',
@@ -112,6 +116,13 @@ async function main() {
         // Reuse existing transport for this session
         transport = transports.get(sessionId)!;
       } else {
+        // Reject if session limit reached
+        if (transports.size >= MAX_SESSIONS) {
+          res.writeHead(429, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Too many sessions' }));
+          return;
+        }
+
         // Create a new MCP server instance per session for isolation
         const mcpServer = createMcpServer();
         // Create new transport with session ID generator

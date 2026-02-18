@@ -34,7 +34,9 @@ export function buildFtsPrefixQuery(input: string): string {
     .filter(token => !FTS5_KEYWORDS.has(token.toUpperCase()));
 
   if (tokens.length === 0) {
-    return `"${input.replace(/"/g, '""')}"`;
+    const sanitized = input.replace(/[^\p{L}\p{N}\s]+/gu, '').trim();
+    if (sanitized.length === 0) return '""';
+    return `"${sanitized.replace(/"/g, '""')}"`;
   }
 
   return tokens.map(token => `"${token}"*`).join(' ');
