@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-02-18T00:00:00Z",
+  "description": "Drift detection checks for GLEIF database integrity",
+  "checks": {
+    "entity_count_range": { "min": 3000000, "max": 4000000 },
+    "schema_version": "1.0.0",
+    "fts_table_exists": true,
+    "required_tables": ["entities", "entities_fts", "sync_log", "metadata"],
+    "known_leis_present": ["7H6GLXDRUGQFU57RNE97", "001GPB6A9XPE8XJICC14"]
+  }
+}

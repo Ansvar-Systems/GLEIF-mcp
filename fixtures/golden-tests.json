@@ -1,0 +1,136 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-02-18T00:00:00Z",
+  "description": "Golden contract tests for GLEIF MCP data accuracy validation",
+  "tests": [
+    {
+      "id": "verify-known-lei-1",
+      "description": "Verify JPMorgan Chase Bank LEI",
+      "tool": "verify_lei",
+      "input": { "lei": "7H6GLXDRUGQFU57RNE97" },
+      "expected": {
+        "found": true,
+        "entity.legal_name": "JPMorgan Chase Bank, National Association",
+        "entity.legal_address_country": "US",
+        "entity.registration_status": "UNKNOWN"
+      }
+    },
+    {
+      "id": "verify-known-lei-2",
+      "description": "Verify European Central Bank LEI",
+      "tool": "verify_lei",
+      "input": { "lei": "549300DTUYXVMJXZNY75" },
+      "expected": {
+        "found": true,
+        "entity.legal_name": "European Central Bank",
+        "entity.legal_address_country": "DE",
+        "entity.registration_status": "UNKNOWN"
+      }
+    },
+    {
+      "id": "verify-known-lei-3",
+      "description": "Verify Morgan Stanley LEI",
+      "tool": "verify_lei",
+      "input": { "lei": "IGJSJL3JD5P30I6NJZ34" },
+      "expected": {
+        "found": true,
+        "entity.legal_name": "MORGAN STANLEY",
+        "entity.legal_address_country": "US",
+        "entity.registration_status": "UNKNOWN"
+      }
+    },
+    {
+      "id": "verify-known-lei-4",
+      "description": "Verify HSBC Bank PLC LEI",
+      "tool": "verify_lei",
+      "input": { "lei": "MP6I5ZYZBEU3UXPYFY54" },
+      "expected": {
+        "found": true,
+        "entity.legal_name": "HSBC BANK PLC",
+        "entity.legal_address_country": "GB",
+        "entity.registration_status": "UNKNOWN"
+      }
+    },
+    {
+      "id": "verify-known-lei-5",
+      "description": "Verify BNP Paribas LEI",
+      "tool": "verify_lei",
+      "input": { "lei": "R0MUWSFPU8MPRO8K5P83" },
+      "expected": {
+        "found": true,
+        "entity.legal_name": "BNP PARIBAS",
+        "entity.legal_address_country": "FR",
+        "entity.registration_status": "UNKNOWN"
+      }
+    },
+    {
+      "id": "verify-known-lei-6",
+      "description": "Verify Bank of America LEI",
+      "tool": "verify_lei",
+      "input": { "lei": "B4TYDEB6GKMZO031MB27" },
+      "expected": {
+        "found": true,
+        "entity.legal_name": "Bank of America, National Association",
+        "entity.legal_address_country": "US",
+        "entity.registration_status": "UNKNOWN"
+      }
+    },
+    {
+      "id": "verify-known-lei-7",
+      "description": "Verify Wells Fargo Securities LEI",
+      "tool": "verify_lei",
+      "input": { "lei": "VYVVCKR63DVZZN70PB21" },
+      "expected": {
+        "found": true,
+        "entity.legal_name": "WELLS FARGO SECURITIES, LLC",
+        "entity.legal_address_country": "US",
+        "entity.registration_status": "UNKNOWN"
+      }
+    },
+    {
+      "id": "search-deutsche-bank",
+      "description": "Search for Deutsche Bank returns results",
+      "tool": "search_entity",
+      "input": { "entity_name": "Deutsche Bank" },
+      "expected": {
+        "total_gt": 0
+      }
+    },
+    {
+      "id": "search-goldman-sachs",
+      "description": "Search for Goldman Sachs returns results",
+      "tool": "search_entity",
+      "input": { "entity_name": "Goldman Sachs" },
+      "expected": {
+        "total_gt": 0
+      }
+    },
+    {
+      "id": "negative-invalid-format",
+      "description": "Invalid LEI format returns not found",
+      "tool": "verify_lei",
+      "input": { "lei": "INVALID" },
+      "expected": {
+        "found": false
+      }
+    },
+    {
+      "id": "negative-nonexistent-lei",
+      "description": "Non-existent valid-format LEI returns not found",
+      "tool": "verify_lei",
+      "input": { "lei": "ZZZZZZZZZZZZZZZZZZZZ" },
+      "expected": {
+        "found": false
+      }
+    },
+    {
+      "id": "health-entity-count",
+      "description": "Health check reports sufficient entity count",
+      "tool": "get_health",
+      "input": {},
+      "expected": {
+        "entity_count_min": 3000000
+      }
+    }
+  ]
+}
