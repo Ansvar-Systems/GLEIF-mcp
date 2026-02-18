@@ -24,11 +24,6 @@ jobs:
         run: npm audit --audit-level=high
         continue-on-error: true # Don't block on moderate vulnerabilities
 
-      - name: Rebuild native dependencies
-        run: |
-          cd node_modules/better-sqlite3
-          npm run install
-
       - name: Build TypeScript
         run: npm run build
 
