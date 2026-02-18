@@ -14,7 +14,7 @@ export async function searchEntity(
 ): Promise<SearchResult> {
   const { entity_name, limit = 10 } = input;
 
-  if (!entity_name || entity_name.trim().length === 0) {
+  if (!entity_name || String(entity_name).trim().length === 0) {
     return {
       results: [],
       total: 0,
@@ -24,5 +24,5 @@ export async function searchEntity(
   // Validate limit
   const safeLimit = Math.min(Math.max(1, limit), 100); // Between 1 and 100
 
-  return db.searchEntity(entity_name, safeLimit);
+  return db.searchEntity(String(entity_name), safeLimit);
 }

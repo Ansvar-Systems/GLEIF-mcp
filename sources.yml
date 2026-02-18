@@ -1,0 +1,38 @@
+# Data Source Provenance for GLEIF MCP Server
+# This file documents every data source used by the server.
+
+sources:
+  - name: GLEIF Golden Copy (LEI-CDF v3.1)
+    description: >
+      Complete registry of Legal Entity Identifiers (LEIs) maintained by the
+      Global Legal Entity Identifier Foundation (GLEIF). Contains all active,
+      lapsed, retired, and annulled LEI records worldwide.
+    authority: Global Legal Entity Identifier Foundation (GLEIF)
+    authority_type: primary
+    url: https://goldencopy.gleif.org/api/v2/golden-copies/publishes/lei2/latest
+    download_url: https://goldencopy.gleif.org/api/v2/golden-copies/publishes/lei2/latest
+    format: CSV (ZIP-compressed)
+    size: ~443 MB compressed, ~2.5 GB uncompressed
+    record_count: ~3,200,000
+    update_frequency: daily
+    update_mechanism: automated (cron at 03:00 UTC via sync-gleif.ts)
+    iso_standard: ISO 17442
+    license: Creative Commons Zero (CC0 1.0)
+    license_url: https://www.gleif.org/en/meta/open-data
+    fields_used:
+      - LEI
+      - Entity.LegalName
+      - Entity.LegalAddress.*
+      - Entity.HeadquartersAddress.*
+      - Entity.LegalJurisdiction
+      - Entity.EntityCategory
+      - Entity.EntityStatus
+      - Registration.RegistrationStatus
+      - Registration.InitialRegistrationDate
+      - Registration.LastUpdateDate
+      - Registration.NextRenewalDate
+      - Registration.ManagingLOU
+    notes: >
+      The Golden Copy is published daily and represents the single authoritative
+      source for all LEI data. No secondary or derived data sources are used.
+      All data transformations are lossless CSV-to-SQLite mappings.

@@ -29,6 +29,9 @@ const DB_PATH = process.env.GLEIF_DB_PATH || join(__dirname, '..', 'data', 'glei
 // HTTP server port
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
+// Maximum concurrent MCP sessions
+const MAX_SESSIONS = parseInt(process.env.MAX_SESSIONS || '100', 10);
+
 let db: DatabaseAdapter;
 
 function getDatabase(): DatabaseAdapter {
@@ -67,8 +70,6 @@ function createMcpServer(): Server {
 
 // Start HTTP server with Streamable HTTP transport
 async function main() {
-  const mcpServer = createMcpServer();
-
   // Map to store transports by session ID
   const transports = new Map<string, StreamableHTTPServerTransport>();
 
@@ -77,8 +78,30 @@ async function main() {
 
     // Health check endpoint
     if (url.pathname === '/health') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok', server: 'gleif-mcp' }));
+      try {
+        const health = getDatabase().getHealth();
+        const status = health.freshness_status === 'critical' ? 'degraded'
+          : health.freshness_status === 'stale' ? 'stale'
+          : 'ok';
+        const httpStatus = status === 'degraded' ? 503 : 200;
+        res.writeHead(httpStatus, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          status,
+          server: 'gleif-mcp',
+          version: '1.0.0',
+          database: {
+            entity_count: health.entity_count,
+            production_ready: health.production_ready,
+            freshness_status: health.freshness_status,
+            data_age_hours: health.data_age_hours,
+            last_sync: health.last_sync,
+          },
+          timestamp: new Date().toISOString(),
+        }));
+      } catch {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'error', server: 'gleif-mcp', error: 'Database unavailable' }));
+      }
       return;
     }
 
@@ -93,6 +116,15 @@ async function main() {
         // Reuse existing transport for this session
         transport = transports.get(sessionId)!;
       } else {
+        // Reject if session limit reached
+        if (transports.size >= MAX_SESSIONS) {
+          res.writeHead(429, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Too many sessions' }));
+          return;
+        }
+
+        // Create a new MCP server instance per session for isolation
+        const mcpServer = createMcpServer();
         // Create new transport with session ID generator
         transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),

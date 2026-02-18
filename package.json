@@ -17,6 +17,8 @@
     "build:db": "node --import tsx scripts/build-db.ts",
     "sync": "node --import tsx scripts/sync-gleif.ts",
     "test": "node test-production.mjs",
+    "test:ci": "node test-ci.mjs",
+    "test:golden": "node test-golden.mjs",
     "prepare": "test -f dist/index.js || npm run build"
   },
   "keywords": [

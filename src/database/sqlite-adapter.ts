@@ -23,18 +23,23 @@ function parseExpectedEntityCount(value: string | undefined): number | null {
   return parsed;
 }
 
-function buildFtsPrefixQuery(input: string): string {
+const FTS5_KEYWORDS = new Set(['AND', 'OR', 'NOT', 'NEAR']);
+
+export function buildFtsPrefixQuery(input: string): string {
   const tokens = input
     .trim()
     .split(/\s+/)
     .map(token => token.replace(/[^\p{L}\p{N}]+/gu, ''))
-    .filter(token => token.length > 0);
+    .filter(token => token.length > 0)
+    .filter(token => !FTS5_KEYWORDS.has(token.toUpperCase()));
 
   if (tokens.length === 0) {
-    return input.replace(/"/g, '""');
+    const sanitized = input.replace(/[^\p{L}\p{N}\s]+/gu, '').trim();
+    if (sanitized.length === 0) return '""';
+    return `"${sanitized.replace(/"/g, '""')}"`;
   }
 
-  return tokens.map(token => `${token}*`).join(' ');
+  return tokens.map(token => `"${token}"*`).join(' ');
 }
 
 /**

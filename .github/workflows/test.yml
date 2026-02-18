@@ -24,19 +24,18 @@ jobs:
         run: npm audit --audit-level=high
         continue-on-error: true # Don't block on moderate vulnerabilities
 
-      - name: Rebuild native dependencies
-        run: |
-          cd node_modules/better-sqlite3
-          npm run install
-
       - name: Build TypeScript
         run: npm run build
 
-      - name: Run tests
-        run: npm test
+      - name: Run CI tests
+        run: npm run test:ci
 
       - name: Test Summary
         if: always()
         run: |
           echo "## Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Tests completed" >> $GITHUB_STEP_SUMMARY
+          echo "CI tests verify input validation, FTS5 query builder, tool registry," >> $GITHUB_STEP_SUMMARY
+          echo "and robustness edge cases without requiring the production database." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Production and golden tests require the 1.6GB GLEIF database" >> $GITHUB_STEP_SUMMARY
+          echo "and should be run locally: \`npm test\` and \`npm run test:golden\`" >> $GITHUB_STEP_SUMMARY
