@@ -2,6 +2,8 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  McpError,
+  ErrorCode,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { DatabaseAdapter } from '../database/types.js';
 
@@ -104,10 +106,7 @@ export function registerTools(server: Server, db: DatabaseAdapter): void {
     const tool = TOOLS.find(t => t.name === name);
 
     if (!tool) {
-      return {
-        content: [{ type: 'text', text: `Unknown tool: ${name}` }],
-        isError: true,
-      };
+      throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
     }
 
     try {
@@ -121,6 +120,9 @@ export function registerTools(server: Server, db: DatabaseAdapter): void {
         ],
       };
     } catch (error) {
+      if (error instanceof McpError) {
+        throw error;
+      }
       return {
         content: [
           {
