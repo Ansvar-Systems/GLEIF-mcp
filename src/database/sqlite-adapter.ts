@@ -25,7 +25,7 @@ function parseExpectedEntityCount(value: string | undefined): number | null {
 
 const FTS5_KEYWORDS = new Set(['AND', 'OR', 'NOT', 'NEAR']);
 
-function buildFtsPrefixQuery(input: string): string {
+export function buildFtsPrefixQuery(input: string): string {
   const tokens = input
     .trim()
     .split(/\s+/)
