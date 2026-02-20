@@ -3,7 +3,7 @@
 # Includes cron for daily GLEIF sync at 3 AM UTC
 
 # Build stage
-FROM --platform=linux/amd64 node:20-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -22,7 +22,7 @@ COPY scripts/ ./scripts/
 RUN npm run build
 
 # Production stage
-FROM --platform=linux/amd64 node:20-alpine AS production
+FROM node:20-alpine AS production
 
 # Install runtime dependencies and cron
 RUN apk add --no-cache \
