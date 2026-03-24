@@ -1,6 +1,9 @@
 # GLEIF MCP Server
 # Multi-stage build for production deployment
-# Includes cron for daily GLEIF sync at 3 AM UTC
+#
+# Data refresh: rebuild the image or run `npm run sync` via docker exec.
+# In-container cron was removed because compose security hardening
+# (cap_drop: ALL, no-new-privileges, user: nodejs) prevents crond.
 
 # Build stage
 FROM node:20-alpine AS builder
@@ -23,11 +26,6 @@ RUN npm run build
 
 # Production stage
 FROM node:20-alpine AS production
-
-# Install runtime dependencies and cron
-RUN apk add --no-cache \
-    dcron \
-    curl
 
 WORKDIR /app
 
@@ -55,21 +53,16 @@ COPY src/database/schema.sql ./src/database/schema.sql
 RUN mkdir -p /app/data && \
     chown -R nodejs:nodejs /app
 
-# Set up cron job for daily sync (3 AM UTC)
-RUN echo "0 3 * * * cd /app && /usr/local/bin/npm run sync >> /var/log/gleif-sync.log 2>&1" > /etc/crontabs/root
-
-# Note: Running as root to allow crond to function
-# This is acceptable for internal MCP servers in controlled Docker networks
-
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV GLEIF_DB_PATH=/app/data/gleif.db
 
 EXPOSE 3000
 
+USER nodejs
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:3000/health || exit 1
+  CMD node -e "fetch('http://localhost:3000/health').then(r=>{if(!r.ok)throw r;process.exit(0)}).catch(()=>process.exit(1))"
 
-# Start cron in background and run HTTP server
-CMD ["sh", "-c", "crond && node dist/http-server.js"]
+CMD ["node", "dist/http-server.js"]
