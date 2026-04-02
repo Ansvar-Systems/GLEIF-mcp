@@ -31,8 +31,14 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 
 // Maximum concurrent MCP sessions
 const MAX_SESSIONS = parseInt(process.env.MAX_SESSIONS || '100', 10);
+const SESSION_IDLE_TTL_MS = parseInt(process.env.SESSION_IDLE_TTL_MS || '900000', 10);
 
 let db: DatabaseAdapter;
+
+interface SessionState {
+  transport: StreamableHTTPServerTransport;
+  lastSeenAt: number;
+}
 
 function getDatabase(): DatabaseAdapter {
   if (!db) {
@@ -71,7 +77,38 @@ function createMcpServer(): Server {
 // Start HTTP server with Streamable HTTP transport
 async function main() {
   // Map to store transports by session ID
-  const transports = new Map<string, StreamableHTTPServerTransport>();
+  const sessions = new Map<string, SessionState>();
+
+  const closeSession = async (sessionId: string, session: SessionState) => {
+    sessions.delete(sessionId);
+
+    const closableTransport = session.transport as StreamableHTTPServerTransport & {
+      close?: () => Promise<void> | void;
+    };
+
+    try {
+      await closableTransport.close?.();
+    } catch (error) {
+      console.error(`Failed to close idle MCP session ${sessionId}:`, error);
+    }
+  };
+
+  const pruneIdleSessions = async () => {
+    if (sessions.size === 0) {
+      return;
+    }
+
+    const cutoff = Date.now() - SESSION_IDLE_TTL_MS;
+    const staleSessions = [...sessions.entries()].filter(([, session]) => session.lastSeenAt < cutoff);
+
+    for (const [sessionId, session] of staleSessions) {
+      await closeSession(sessionId, session);
+    }
+
+    if (staleSessions.length > 0) {
+      console.error(`Pruned ${staleSessions.length} idle MCP sessions`);
+    }
+  };
 
   const httpServer = createServer(async (req, res) => {
     const url = new URL(req.url || '/', `http://localhost:${PORT}`);
@@ -107,17 +144,22 @@ async function main() {
 
     // MCP endpoint
     if (url.pathname === '/mcp') {
+      await pruneIdleSessions();
+
       // Get or create session
       const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
       let transport: StreamableHTTPServerTransport;
+      const now = Date.now();
 
-      if (sessionId && transports.has(sessionId)) {
+      if (sessionId && sessions.has(sessionId)) {
         // Reuse existing transport for this session
-        transport = transports.get(sessionId)!;
+        const session = sessions.get(sessionId)!;
+        session.lastSeenAt = now;
+        transport = session.transport;
       } else {
         // Reject if session limit reached
-        if (transports.size >= MAX_SESSIONS) {
+        if (sessions.size >= MAX_SESSIONS) {
           res.writeHead(429, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Too many sessions' }));
           return;
@@ -136,7 +178,7 @@ async function main() {
         // Store transport by session ID once it's assigned
         transport.onclose = () => {
           if (transport.sessionId) {
-            transports.delete(transport.sessionId);
+            sessions.delete(transport.sessionId);
           }
         };
       }
@@ -145,8 +187,13 @@ async function main() {
       await transport.handleRequest(req, res);
 
       // Store transport if new session was created
-      if (transport.sessionId && !transports.has(transport.sessionId)) {
-        transports.set(transport.sessionId, transport);
+      if (transport.sessionId) {
+        const existingSession = sessions.get(transport.sessionId);
+        if (existingSession) {
+          existingSession.lastSeenAt = now;
+        } else {
+          sessions.set(transport.sessionId, { transport, lastSeenAt: now });
+        }
       }
 
       return;
