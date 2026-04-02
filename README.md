@@ -47,21 +47,21 @@ This MCP server makes GLEIF's 3.2M LEI records **searchable, offline, and AI-rea
 
 ```
 ┌─────────────────────────────────────────────┐
-│         GLEIF MCP Container                 │
-│                                             │
-│  HTTP Server ──▶ SQLite Database            │
-│  (Port 3000)     (3.2M LEI records)        │
-│                         ▲                   │
-│  MCP Tools          Sync Scheduler          │
-│  - verify_lei       (Daily at 3 AM)        │
-│  - search_entity                           │
-│  - get_health                              │
-│                         │                   │
+│ GLEIF MCP Container │
+│ │
+│ HTTP Server ──▶ SQLite Database │
+│ (Port 3000) (3.2M LEI records) │
+│ ▲ │
+│ MCP Tools Sync Scheduler │
+│ - verify_lei (Daily at 3 AM) │
+│ - search_entity │
+│ - get_health │
+│ │ │
 └─────────────────────────┼───────────────────┘
-                          │ (When online)
-                          ▼
-              GLEIF Golden Copy API
-        (Bulk data + publish metadata)
+ │ (When online)
+ ▼
+ GLEIF Golden Copy API
+ (Bulk data + publish metadata)
 ```
 
 ---
@@ -79,12 +79,12 @@ Add to your `claude_desktop_config.json`:
 
 ```json
 {
-  "mcpServers": {
-    "gleif": {
-      "command": "npx",
-      "args": ["-y", "@ansvar/gleif-mcp"]
-    }
-  }
+ "mcpServers": {
+ "gleif": {
+ "command": "npx",
+ "args": ["-y", "@ansvar/gleif-mcp"]
+ }
+ }
 }
 ```
 
@@ -101,12 +101,12 @@ Browse and install from the [official MCP registry](https://registry.modelcontex
 
 ```json
 {
-  "mcp.servers": {
-    "gleif": {
-      "command": "npx",
-      "args": ["-y", "@ansvar/gleif-mcp"]
-    }
-  }
+ "mcp.servers": {
+ "gleif": {
+ "command": "npx",
+ "args": ["-y", "@ansvar/gleif-mcp"]
+ }
+ }
 }
 ```
 
@@ -142,6 +142,33 @@ docker-compose up -d
 
 ---
 
+
+### Public Endpoint (Streamable HTTP)
+
+Connect from any MCP client (Claude Desktop, ChatGPT, Cursor, VS Code, GitHub Copilot):
+
+```
+https://mcp.ansvar.eu/gleif/mcp
+```
+
+**Claude Code:**
+```bash
+claude mcp add gleif --transport http https://mcp.ansvar.eu/gleif/mcp
+```
+
+**Claude Desktop / Cursor** (`claude_desktop_config.json`):
+```json
+{
+ "mcpServers": {
+ "gleif": {
+ "type": "url",
+ "url": "https://mcp.ansvar.eu/gleif/mcp"
+ }
+ }
+}
+```
+
+No authentication required. See [all Ansvar MCP endpoints](https://github.com/Ansvar-Systems/Ansvar-Architecture-Documentation/blob/main/docs/mcp-remote-access.md).
 ## Example Queries
 
 Once connected, just ask naturally:
@@ -166,7 +193,7 @@ Once connected, just ask naturally:
 Input:
 ```json
 {
-  "lei": "549300XQFX8FNB77HY47"
+ "lei": "549300XQFX8FNB77HY47"
 }
 ```
 
@@ -183,8 +210,8 @@ Response includes:
 Input:
 ```json
 {
-  "entity_name": "Deutsche Bank",
-  "limit": 10
+ "entity_name": "Deutsche Bank",
+ "limit": 10
 }
 ```
 
@@ -202,19 +229,19 @@ Returns:
 **Example response:**
 ```json
 {
-  "server": "gleif-mcp",
-  "version": "1.0.0",
-  "database": {
-    "entity_count": 3195676,
-    "expected_entity_count": 3195676,
-    "coverage_ratio": 1.0,
-    "production_ready": true,
-    "data_quality_status": "ok",
-    "last_sync": "2026-01-30T00:00:00Z",
-    "data_age_hours": 8.2,
-    "freshness_status": "current",
-    "database_version": "1.0.0"
-  }
+ "server": "gleif-mcp",
+ "version": "1.0.0",
+ "database": {
+ "entity_count": 3195676,
+ "expected_entity_count": 3195676,
+ "coverage_ratio": 1.0,
+ "production_ready": true,
+ "data_quality_status": "ok",
+ "last_sync": "2026-01-30T00:00:00Z",
+ "data_age_hours": 8.2,
+ "freshness_status": "current",
+ "database_version": "1.0.0"
+ }
 }
 ```
 
@@ -270,12 +297,12 @@ Banks and financial institutions require self-contained systems. External API de
 - API costs scale with usage
 
 **This MCP Server Solves All of These:**
-- ✅ **No runtime external API calls** — Query 3.2M entities locally
-- ✅ **No rate limits** — Process millions of lookups instantly
-- ✅ **Works offline** — Last-synced data always available
-- ✅ **Data freshness monitoring** — Audit trail in sync_log
-- ✅ **Zero vendor dependencies** — Self-contained SQLite database
-- ✅ **Predictable costs** — No per-query fees
+- **No runtime external API calls** — Query 3.2M entities locally
+- **No rate limits** — Process millions of lookups instantly
+- **Works offline** — Last-synced data always available
+- **Data freshness monitoring** — Audit trail in sync_log
+- **Zero vendor dependencies** — Self-contained SQLite database
+- **Predictable costs** — No per-query fees
 
 **Compliance Use Cases:**
 - MiFID II counterparty identification
@@ -306,13 +333,13 @@ Add to `Ansvar_platform/.mcp.config.local`:
 
 ```json
 {
-  "name": "gleif",
-  "repo": "https://github.com/Ansvar-Systems/GLEIF-MCP.git",
-  "port": 8303,
-  "sources": ["GLEIF", "LEI"],
-  "fail_fast": true,
-  "base_url": "http://ansvar-gleif-mcp:3000",
-  "comment": "TIER 1: Offline-first with SQLite, daily GLEIF sync"
+ "name": "gleif",
+ "repo": "https://github.com/Ansvar-Systems/GLEIF-MCP.git",
+ "port": 8303,
+ "sources": ["GLEIF", "LEI"],
+ "fail_fast": true,
+ "base_url": "http://ansvar-gleif-mcp:3000",
+ "comment": "TIER 1: Offline-first with SQLite, daily GLEIF sync"
 }
 ```
 
@@ -343,7 +370,7 @@ All LEI data is sourced verbatim from the **GLEIF Golden Copy API v2**:
 
 This server is part of **Ansvar's Compliance Suite** - MCP servers that work together for end-to-end regulatory coverage:
 
-### 🏦 GLEIF MCP (This Project)
+### GLEIF MCP (This Project)
 **Verify 3.2M Legal Entity Identifiers directly from Claude**
 - LEI verification and entity search
 - Self-contained SQLite database (3,195,676 records)
@@ -364,7 +391,7 @@ This server is part of **Ansvar's Compliance Suite** - MCP servers that work tog
 - Breach notification timeline mapping
 - **Install:** `npx @ansvar/us-regulations-mcp`
 
-### 🔐 [Security Controls MCP](https://github.com/Ansvar-Systems/security-controls-mcp)
+### [Security Controls MCP](https://github.com/Ansvar-Systems/security-controls-mcp)
 **Query 1,451 security controls across 28 frameworks**
 - ISO 27001, NIST CSF, DORA, PCI DSS, SOC 2, CMMC, and more
 - Bidirectional framework mapping and gap analysis
@@ -377,13 +404,13 @@ This server is part of **Ansvar's Compliance Suite** - MCP servers that work tog
 
 ```
 1. "Verify LEI for this counterparty: 549300XQFX8FNB77HY47"
-   → GLEIF MCP returns full entity details
+ → GLEIF MCP returns full entity details
 
 2. "What are MiFID II requirements for LEI reporting?"
-   → EU Regulations MCP returns Article text
+ → EU Regulations MCP returns Article text
 
 3. "What controls implement MiFID II Article 65?"
-   → Security Controls MCP maps to ISO 27001/NIST CSF
+ → Security Controls MCP maps to ISO 27001/NIST CSF
 ```
 
 **Complete compliance in one chat:**
@@ -427,5 +454,5 @@ Apache License 2.0. See [LICENSE](LICENSE) for details.
 ---
 
 <p align="center">
-  <sub>Built with care in Stockholm, Sweden</sub>
+ <sub>Built with care in Stockholm, Sweden</sub>
 </p>
