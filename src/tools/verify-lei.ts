@@ -1,4 +1,5 @@
 import type { DatabaseAdapter, LEIRecord } from '../database/types.js';
+import { buildCitation } from '../utils/citation.js';
 
 export interface VerifyLEIInput {
   lei: string;
@@ -42,5 +43,12 @@ export async function verifyLEI(
     found: true,
     lei: record.lei,
     entity: record,
+    _citation: buildCitation(
+      record.lei,
+      `${record.legal_name} (${record.lei})`,
+      'verify_lei',
+      { lei: record.lei },
+      `https://search.gleif.org/#/record/${record.lei}`,
+    ),
   };
 }
