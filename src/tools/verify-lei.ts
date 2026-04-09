@@ -1,4 +1,5 @@
 import type { DatabaseAdapter, LEIRecord } from '../database/types.js';
+import { buildMeta, buildCitation, type MetaBlock, type CitationBlock } from './meta.js';
 
 export interface VerifyLEIInput {
   lei: string;
@@ -9,6 +10,9 @@ export interface VerifyLEIOutput {
   lei?: string;
   entity?: LEIRecord;
   message?: string;
+  _error_type?: 'validation_error' | 'not_found';
+  _meta: MetaBlock;
+  _citation?: CitationBlock;
 }
 
 /**
@@ -25,6 +29,8 @@ export async function verifyLEI(
     return {
       found: false,
       message: 'Invalid LEI format. LEI must be exactly 20 alphanumeric characters.',
+      _error_type: 'validation_error',
+      _meta: buildMeta(),
     };
   }
 
@@ -35,6 +41,8 @@ export async function verifyLEI(
       found: false,
       lei: lei.toUpperCase(),
       message: 'LEI not found in database. Entity may not be registered or database needs sync.',
+      _error_type: 'not_found',
+      _meta: buildMeta(),
     };
   }
 
@@ -42,5 +50,7 @@ export async function verifyLEI(
     found: true,
     lei: record.lei,
     entity: record,
+    _meta: buildMeta(),
+    _citation: buildCitation(record.lei, record.legal_name),
   };
 }
