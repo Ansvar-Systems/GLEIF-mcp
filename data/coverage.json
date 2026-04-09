@@ -1,0 +1,8 @@
+{
+  "generated_at": null,
+  "entity_count": null,
+  "expected_entity_count": null,
+  "coverage_ratio": null,
+  "production_ready": false,
+  "note": "Placeholder — populated automatically by ingest.yml after each database build. Run 'npm run build:db' or 'npm run sync' locally to populate."
+}
