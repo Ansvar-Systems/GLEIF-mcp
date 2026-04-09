@@ -1,0 +1,107 @@
+name: Ingest GLEIF Data
+
+on:
+  schedule:
+    # Daily at 03:00 UTC — after GLEIF publishes the Golden Copy (~01:00-02:00 UTC)
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: 'Force full database rebuild even if no new data'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    # Larger runner recommended for 1.6GB database build; fall back to ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Check for new GLEIF Golden Copy
+        id: check
+        run: |
+          # Try to detect if a new Golden Copy has been published today
+          TODAY=$(date -u +%Y-%m-%d)
+          echo "Checking for GLEIF Golden Copy published on $TODAY"
+
+          # Check GLEIF publication API (the sync script handles this internally)
+          echo "date=$TODAY" >> "$GITHUB_OUTPUT"
+          echo "force=${{ inputs.force_rebuild || 'false' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build / sync GLEIF database
+        run: |
+          if [ "${{ steps.check.outputs.force }}" = "true" ]; then
+            echo "Force rebuild requested — running full build"
+            npm run build:db
+          else
+            echo "Running incremental sync (will rebuild if new data available)"
+            npm run sync
+          fi
+        env:
+          GLEIF_DB_PATH: ./data/gleif.db
+
+      - name: Validate database
+        run: |
+          ENTITY_COUNT=$(node -e "
+            import('@ansvar/mcp-sqlite').then(m => {
+              const db = m.openDatabase('./data/gleif.db', { readonly: true });
+              const row = db.prepare('SELECT COUNT(*) as cnt FROM entities').get();
+              console.log(row.cnt);
+              db.close();
+            }).catch(e => { console.error(e); process.exit(1); });
+          " 2>/dev/null || echo "0")
+
+          echo "Entity count: $ENTITY_COUNT"
+
+          if [ "$ENTITY_COUNT" -lt 1000000 ] 2>/dev/null; then
+            echo "::error::Database has fewer than 1M entities ($ENTITY_COUNT). Build may have failed."
+            exit 1
+          fi
+
+          echo "## Ingest Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Date | ${{ steps.check.outputs.date }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Entity Count | $ENTITY_COUNT |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status | Success |" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Update coverage.json
+        run: |
+          node -e "
+            import('@ansvar/mcp-sqlite').then(m => {
+              const db = m.openDatabase('./data/gleif.db', { readonly: true });
+              const count = db.prepare('SELECT COUNT(*) as cnt FROM entities').get().cnt;
+              const meta = db.prepare(\"SELECT value FROM metadata WHERE key='expected_entities'\").get();
+              const expected = meta ? parseInt(meta.value) : null;
+              const ratio = expected ? (count / expected) : null;
+              const coverage = {
+                generated_at: new Date().toISOString(),
+                entity_count: count,
+                expected_entity_count: expected,
+                coverage_ratio: ratio,
+                production_ready: count >= 1000000 && (ratio === null || ratio >= 0.98),
+              };
+              require('fs').writeFileSync('./data/coverage.json', JSON.stringify(coverage, null, 2));
+              db.close();
+              console.log('coverage.json updated:', coverage);
+            }).catch(e => { console.error(e); process.exit(1); });
+          " 2>/dev/null || echo '{"generated_at":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'","note":"Could not compute coverage after ingest"}' > ./data/coverage.json
+
+      - name: Upload database artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gleif-db-${{ steps.check.outputs.date }}
+          path: data/gleif.db
+          retention-days: 7
+          if-no-files-found: warn

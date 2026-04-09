@@ -1,0 +1,32 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '08:00'
+      timezone: UTC
+    open-pull-requests-limit: 5
+    target-branch: dev
+    labels:
+      - dependencies
+    groups:
+      dev-dependencies:
+        dependency-type: development
+      production-dependencies:
+        dependency-type: production
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '08:00'
+      timezone: UTC
+    open-pull-requests-limit: 5
+    target-branch: dev
+    labels:
+      - dependencies
+      - github-actions
